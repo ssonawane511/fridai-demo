@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import * as Sentry from '@sentry/react'
 import { createBlog } from '../api/blogs'
 
 // BUGGY CreateBlog - form with many broken behaviors
@@ -12,10 +13,10 @@ export default function CreateBlog({ onSuccess, onCancel }) {
   const [submitting, setSubmitting] = useState(false)
   const [validationErrors, setValidationErrors] = useState([])
 
-  // Bug: validateForm - validates wrong field names (title vs titl)
+  // Bug: validateForm checks formData.title but input updates formData.titl - validation NEVER passes for title!
   const validateForm = () => {
     const errs = []
-    if (!formData.title) errs.push('Title is required')
+    if (!formData.title) errs.push('Title is required')  // formData.title is never set (we use titl)
     if (!formData.content) errs.push('Content is required')
     if (!formData.author?.name) errs.push('Author name is required')
     setValidationErrors(errs)
@@ -38,9 +39,19 @@ export default function CreateBlog({ onSuccess, onCancel }) {
     e.preventDefault()
     setSubmitting(true)
 
+    const transaction = Sentry.startInactiveSpan({
+      name: 'create-blog-submit',
+      op: 'ui.action',
+      forceTransaction: true,
+    })
+    Sentry.setActiveSpanInBrowser?.(transaction)
+    transaction.setAttribute('feature', 'create-blog')
+
     // Bug: validateForm checks formData.title but we have formData.titl
     if (!validateForm()) {
       setSubmitting(false)
+      transaction.setStatus({ code: 2 })
+      transaction.end()
       return
     }
 
@@ -51,12 +62,17 @@ export default function CreateBlog({ onSuccess, onCancel }) {
         content: formData.content,
         author: formData.author
       })
+      transaction.setAttribute('blog.id', newId)
+      transaction.setStatus({ code: 1 })
       // Bug: createBlog returns length not id - onSuccess gets wrong id
       onSuccess(newId)
     } catch (err) {
+      Sentry.captureException(err)
+      transaction.setStatus({ code: 2 })
       setValidationErrors([err.message])
     } finally {
       setSubmitting(false)
+      transaction.end()
     }
   }
 

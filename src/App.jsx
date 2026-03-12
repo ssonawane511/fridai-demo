@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import * as Sentry from '@sentry/react'
 import BlogList from './components/BlogList'
 import BlogPost from './components/BlogPost'
 import CreateBlog from './components/CreateBlog'
@@ -89,6 +90,7 @@ function App() {
   }
 
   return (
+    <Sentry.ErrorBoundary fallback={<p>An error has occurred. Please refresh the page.</p>}>
     <div className="app">
       <header className="app-header">
         {/* Bug: Clicking logo doesn't reset state properly - editPostId lingers */}
@@ -100,6 +102,7 @@ function App() {
         {renderView()}
       </main>
     </div>
+    </Sentry.ErrorBoundary>
   )
 }
 

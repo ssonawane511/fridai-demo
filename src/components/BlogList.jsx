@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import * as Sentry from '@sentry/react'
 import { getBlogs, deleteBlog, searchBlogs } from '../api/blogs'
 
 // BUGGY BlogList - many intentional bugs
@@ -13,29 +14,58 @@ export default function BlogList({ onSelectPost, onCreateNew }) {
   const [selectedId, setSelectedId] = useState(null)
 
   useEffect(() => {
-    // Bug: getBlogs() can return undefined randomly - crashes when data.map is called
-    const data = getBlogs()
-    setPosts(data || [])
-    setLoading(false)
+    const transaction = Sentry.startInactiveSpan({
+      name: 'blog-list-load',
+      op: 'ui.load',
+      forceTransaction: true,
+    })
+    Sentry.setActiveSpanInBrowser?.(transaction)
+    transaction.setAttribute('feature', 'blog-list')
+
+    try {
+      // Bug: getBlogs() can return undefined randomly - crashes when data.map is called
+      const data = getBlogs()
+      setPosts(data || [])
+      transaction.setStatus({ code: 1 })
+    } catch (err) {
+      Sentry.captureException(err)
+      transaction.setStatus({ code: 2 })
+    } finally {
+      setLoading(false)
+      transaction.end()
+    }
     // Bug: No cleanup - memory leak if component unmounts during async
     // Bug: Empty deps but we read from getBlogs which has random behavior
   }, [])
 
-  // Bug: handleDelete - passes wrong id (index instead of id)
+  // Bug: handleDelete - passes INDEX to deleteBlog which expects ID, then deletes wrong item!
   const handleDelete = (e, index) => {
     e.stopPropagation()
-    // Bug: Uses index as id - deletes wrong blog!
-    deleteBlog(index)
-    // Bug: Filter uses wrong comparison - post.id vs index
-    setPosts(prev => prev.filter((_, i) => i !== index))
+    const span = Sentry.startInactiveSpan({ name: 'blog-delete', op: 'ui.action', forceTransaction: true })
+    Sentry.setActiveSpanInBrowser?.(span)
+    try {
+      const postId = posts[index]?.id
+      deleteBlog(postId ?? index)
+      setPosts(prev => prev.filter((_, i) => i !== index))
+      span.setStatus({ code: 1 })
+    } catch (err) {
+      Sentry.captureException(err)
+      span.setStatus({ code: 2 })
+    } finally {
+      span.end()
+    }
   }
 
   // Bug: handleSearch - searches but displays wrong results, and DESTROYS the list
   const handleSearch = () => {
+    const span = Sentry.startInactiveSpan({ name: 'blog-search', op: 'ui.action', forceTransaction: true })
+    Sentry.setActiveSpanInBrowser?.(span)
     const results = searchBlogs(searchTerm)
     // Bug: searchBlogs has typo (titl vs title) so never finds anything - returns []
     // Bug: Replaces posts permanently - can't get original list back without refresh!
     setPosts(results || [])
+    span.setStatus({ code: 1 })
+    span.end()
   }
 
   // Bug: filteredPosts - uses wrong variable (post vs posts)

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import * as Sentry from '@sentry/react'
 import { fetchBlogById, updateBlog } from '../api/blogs'
 
 // BUGGY EditBlog - edit form with wrong data binding and logic
@@ -9,16 +10,33 @@ export default function EditBlog({ postId, onSuccess, onCancel }) {
 
   useEffect(() => {
     if (!postId) return
-    // Bug: fetchBlogById has idx typo - returns undefined for valid ids
-    const data = fetchBlogById(postId)
-    setPost(data)
-    if (data) {
-      // Bug: Spread might fail if data has unexpected shape
-      setFormData({
-        title: data.title,
-        content: data.content,
-        author: data.author || { name: '' }
-      })
+
+    const transaction = Sentry.startInactiveSpan({
+      name: 'edit-blog-load',
+      op: 'ui.load',
+      forceTransaction: true,
+    })
+    Sentry.setActiveSpanInBrowser?.(transaction)
+    transaction.setAttribute('feature', 'edit-blog')
+    transaction.setAttribute('blog.id', postId)
+
+    try {
+      // Bug: fetchBlogById has idx typo - returns undefined for valid ids
+      const data = fetchBlogById(postId)
+      setPost(data)
+      if (data) {
+        setFormData({
+          title: data.title,
+          content: data.content,
+          author: data.author || { name: '' }
+        })
+      }
+      transaction.setStatus({ code: 1 })
+    } catch (err) {
+      Sentry.captureException(err)
+      transaction.setStatus({ code: 2 })
+    } finally {
+      transaction.end()
     }
   }, [postId])
 
@@ -37,16 +55,32 @@ export default function EditBlog({ postId, onSuccess, onCancel }) {
     e.preventDefault()
     setSaving(true)
 
-    // Bug: updateBlog uses id as array index - wrong for non-sequential ids
-    updateBlog(postId, {
-      title: formData.title,
-      content: formData.content,
-      author: formData.author
+    const transaction = Sentry.startInactiveSpan({
+      name: 'edit-blog-save',
+      op: 'ui.action',
+      forceTransaction: true,
     })
+    Sentry.setActiveSpanInBrowser?.(transaction)
+    transaction.setAttribute('feature', 'edit-blog')
+    transaction.setAttribute('blog.id', postId)
 
-    // Bug: onSuccess called before state updates - race condition
-    onSuccess()
-    setSaving(false)
+    try {
+      // Bug: updateBlog uses id as array index - wrong for non-sequential ids
+      updateBlog(postId, {
+        title: formData.title,
+        content: formData.content,
+        author: formData.author
+      })
+      transaction.setStatus({ code: 1 })
+      // Bug: onSuccess called before state updates - race condition
+      onSuccess()
+    } catch (err) {
+      Sentry.captureException(err)
+      transaction.setStatus({ code: 2 })
+    } finally {
+      setSaving(false)
+      transaction.end()
+    }
   }
 
   if (!post) return <div>Loading...</div>

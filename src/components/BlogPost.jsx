@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import * as Sentry from '@sentry/react'
 import { fetchBlogById } from '../api/blogs'
 
 // BUGGY BlogPost - single post view with many bugs
@@ -8,15 +9,35 @@ export default function BlogPost({ postId, onBack, onEdit }) {
 
   useEffect(() => {
     if (!postId) return
-    // Bug: fetchBlogById has typo (idx vs id) - never finds blog
-    const data = fetchBlogById(postId)
-    setPost(data)
-    setLoading(false)
+
+    const transaction = Sentry.startInactiveSpan({
+      name: 'blog-post-load',
+      op: 'ui.load',
+      forceTransaction: true,
+    })
+    Sentry.setActiveSpanInBrowser?.(transaction)
+    transaction.setAttribute('feature', 'blog-post')
+    transaction.setAttribute('blog.id', postId)
+
+    try {
+      // Bug: fetchBlogById has typo (idx vs id) - never finds blog
+      const data = fetchBlogById(postId)
+      setPost(data)
+      transaction.setStatus({ code: 1 })
+    } catch (err) {
+      Sentry.captureException(err)
+      transaction.setStatus({ code: 2 })
+    } finally {
+      setLoading(false)
+      transaction.end()
+    }
   }, [postId])
 
-  // Bug: Format date without null check - crashes on invalid date
+  // Bug: formatDate - crashes on invalid date string (e.g. undefined, "invalid")
   const formatDate = (dateStr) => {
-    return new Date(dateStr).toLocaleDateString()
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) throw new Error('Invalid date')
+    return d.toLocaleDateString()
   }
 
   if (loading) return <div>Loading post...</div>
