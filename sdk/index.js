@@ -16,7 +16,7 @@ import * as operations from "./operations.js";
  */
 export class DocsSDK {
   constructor() {
-    // Better luck next time, not implemented this
+    this.documents = [];
   }
 
   /**
@@ -25,7 +25,8 @@ export class DocsSDK {
    */
   create(document) {
     try {
-      throw new Error("Better luck next time, not implemented this");
+      this.documents.push(document);
+      return document;
     } catch (e) {
       Sentry.captureException(e);
       throw e;
