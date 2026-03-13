@@ -1,3 +1,4 @@
+# Requires GH_PAT secret (PAT with repo scope) - GITHUB_TOKEN cannot create PRs in some repos
 name: codex_analyzer
 
 on:
@@ -56,9 +57,7 @@ jobs:
           2. Identify the root cause in the repository.
           3. Create a TEMPORARY Jest test reproducing the bug.
 
-          The temporary test must be placed in:
-
-          .tmp-tests/
+          The temporary test MUST be placed in .tmp-tests/ and MUST use the .test.js extension (e.g. .tmp-tests/bug.test.js) so Jest can find it.
 
           Requirements:
 
@@ -73,7 +72,7 @@ jobs:
           - Do NOT modify package.json.
           - Do NOT commit files inside .tmp-tests/
 
-          Output format:
+          Output format (in your final message):
 
           ROOT CAUSE
           <short explanation>
@@ -91,26 +90,29 @@ jobs:
 
       - name: Attempt Fix (max 3)
         run: |
+          set -e
           mkdir -p .tmp-tests
 
-          for i in 1 2 3
-          do
-            echo "Attempt $i"
+          for i in 1 2 3; do
+            echo "=== Attempt $i/3 ==="
+            echo "OPENAI_API_KEY length: ${#OPENAI_API_KEY}"
 
             codex \
               --model gpt-5-codex \
-              --apply \
               --prompt-file codex-prompt.md \
-              --output-file codex-output.md || true
+              --output-file codex-output.md || { echo "Codex failed"; continue; }
 
-            echo "Running temporary tests"
+            echo "Running temporary tests..."
+            ls -la .tmp-tests/ 2>/dev/null || echo "No files in .tmp-tests yet"
 
-            if npx jest .tmp-tests; then
-              echo "Tests passed"
-              exit 0
+            if npx jest .tmp-tests --passWithNoTests; then
+              if [ -n "$(find .tmp-tests -name '*.test.js' 2>/dev/null || true)" ]; then
+                echo "Tests passed"
+                exit 0
+              fi
             fi
 
-            echo "Fix attempt failed"
+            echo "Fix attempt $i failed"
           done
 
           echo "TEST_FAILED=true" >> $GITHUB_ENV
@@ -137,23 +139,27 @@ jobs:
 
       - name: Create Pull Request (success)
         if: env.TEST_FAILED != 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          branch: codex/fix-${{ github.run_id }}
-          title: "Codex Fix"
-          body-path: codex-output.md
+        run: |
+          gh pr create \
+            --base ${{ github.event.workflow_run.head_branch }} \
+            --head codex/fix-${{ github.run_id }} \
+            --title "Codex Fix" \
+            --body-file codex-output.md
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
 
       - name: Create Pull Request (needs help)
         if: env.TEST_FAILED == 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          branch: codex/fix-${{ github.run_id }}
-          title: "Codex Fix (Needs Help)"
-          body: |
-            ROOT CAUSE
-            Could not fully resolve automatically.
-
-            FIX SUMMARY
-            Partial fix attempt created by Codex.
-
-          labels: needs-help
+        run: |
+          echo "ROOT CAUSE" > pr-body.md
+          echo "Could not fully resolve automatically." >> pr-body.md
+          echo "" >> pr-body.md
+          echo "FIX SUMMARY" >> pr-body.md
+          echo "Partial fix attempt created by Codex." >> pr-body.md
+          gh pr create \
+            --base ${{ github.event.workflow_run.head_branch }} \
+            --head codex/fix-${{ github.run_id }} \
+            --title "Codex Fix (Needs Help)" \
+            --body-file pr-body.md
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
