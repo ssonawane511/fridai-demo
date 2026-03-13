@@ -25,7 +25,15 @@ export class DocsSDK {
    */
   create(document) {
     try {
-      throw new Error("Better luck next time, not implemented this");
+      if (!document || typeof document !== "object") {
+        throw new Error("Invalid document payload");
+      }
+
+      return {
+        id: document.id,
+        title: document.title,
+        content: document.content,
+      };
     } catch (e) {
       Sentry.captureException(e);
       throw e;
