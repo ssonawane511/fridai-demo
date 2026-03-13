@@ -74,6 +74,7 @@ jobs:
           - Follow SOLID, DRY and KISS.
           - Do NOT modify package.json.
           - Do NOT commit files inside .tmp-tests/
+          - Run tests with: NODE_OPTIONS=--experimental-vm-modules npx jest .tmp-tests (project uses ESM)
 
           Output format (in your final message):
 
@@ -114,7 +115,7 @@ jobs:
             echo "Running temporary tests..."
             ls -la .tmp-tests/ 2>/dev/null || echo "No files in .tmp-tests yet"
 
-            if npx jest .tmp-tests --passWithNoTests; then
+            if NODE_OPTIONS=--experimental-vm-modules npx jest .tmp-tests --passWithNoTests; then
               if [ -n "$(find .tmp-tests -name '*.test.js' 2>/dev/null || true)" ]; then
                 echo "Tests passed"
                 exit 0
@@ -127,6 +128,7 @@ jobs:
           echo "TEST_FAILED=true" >> $GITHUB_ENV
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          NODE_OPTIONS: --experimental-vm-modules
 
       - name: Create Branch
         run: git checkout -b codex/fix-${{ github.run_id }}
