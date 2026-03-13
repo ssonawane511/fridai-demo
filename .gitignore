@@ -1,3 +1,8 @@
 node_modules
 .env
 .tmp-tests
+# Codex workflow artifacts — do not push
+ai-context/
+codex-output.md
+codex-prompt.md
+pr-body.md

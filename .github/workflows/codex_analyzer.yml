@@ -152,6 +152,7 @@ jobs:
           git config user.email "codex-bot@users.noreply.github.com"
 
           git add .
+          git reset HEAD ai-context/ codex-output.md codex-prompt.md pr-body.md 2>/dev/null || true
 
           git commit -m "codex automatic fix" || echo "No changes"
 
