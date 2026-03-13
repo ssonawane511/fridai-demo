@@ -91,7 +91,7 @@ jobs:
       - name: Authenticate Codex
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: codex login --api-key "$OPENAI_API_KEY"
+        run: printenv OPENAI_API_KEY | codex login --with-api-key
 
       - name: Attempt Fix (max 3)
         run: |
