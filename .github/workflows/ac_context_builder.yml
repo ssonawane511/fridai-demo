@@ -1,0 +1,145 @@
+name: ac_context_builder
+
+on:
+  workflow_dispatch:
+  issues:
+    types: [opened, reopened]
+
+jobs:
+  build-context:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      # --------------------------------
+      # Extract Sentry Issue ID
+      # --------------------------------
+      - name: Extract Sentry Issue ID
+        if: github.event_name == 'issues'
+        id: sentry_issue
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          printf "%s\n" "$ISSUE_BODY" > issue_body.txt
+          FIRST_LINE=$(head -n 1 issue_body.txt)
+
+          echo "First line: $FIRST_LINE"
+      
+          ISSUE_ID=$(printf "%s\n" "$FIRST_LINE" | sed -n 's/.*sentry::issueid::\([0-9]*\).*/\1/p')
+      
+          echo "Extracted issue id: $ISSUE_ID"
+      
+          echo "ISSUE_ID=$ISSUE_ID" >> $GITHUB_ENV
+
+      # --------------------------------
+      # Fetch Sentry Event
+      # --------------------------------
+      - name: Fetch Sentry Latest Event
+        if: github.event_name == 'issues'
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          if [ -n "$ISSUE_ID" ]; then
+            echo "Fetching Sentry event for issue $ISSUE_ID"
+
+            curl -s \
+              -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
+              -H "Content-Type: application/json" \
+              https://sentry.io/api/0/organizations/fridai/issues/$ISSUE_ID/events/latest/ \
+              > sentry_event.json
+          else
+            echo "No Sentry issue id found"
+          fi
+
+      # --------------------------------
+      # Fetch GitBook Pages
+      # --------------------------------
+      - name: Fetch GitBook Pages
+        env:
+          GITBOOK_TOKEN: ${{ secrets.GIT_BOOK }}
+          SPACE_ID: ${{ secrets.GIT_BOOK_SPACE_ID }}
+        run: |
+          curl -s \
+            -H "Authorization: Bearer $GITBOOK_TOKEN" \
+            -H "accept: application/json" \
+            "https://api.gitbook.com/v1/spaces/$SPACE_ID/content/pages?metadata=true&computed=true" \
+            > pages.json
+
+      - name: Extract Page IDs
+        run: |
+          jq -r '.pages[].id' pages.json > page_ids.txt
+
+      # --------------------------------
+      # Build Context
+      # --------------------------------
+      - name: Create Context File
+        env:
+          GITBOOK_TOKEN: ${{ secrets.GIT_BOOK }}
+          SPACE_ID: ${{ secrets.GIT_BOOK_SPACE_ID }}
+        run: |
+          echo "AI Context Build" > context.txt
+          echo "=================" >> context.txt
+          echo "" >> context.txt
+
+          # Add issue title
+          if [ "${{ github.event_name }}" = "issues" ]; then
+            echo "ISSUE TITLE:" >> context.txt
+            echo "${{ github.event.issue.title }}" >> context.txt
+            echo "" >> context.txt
+          fi
+
+          # Add GitBook docs
+          while read PAGE_ID; do
+            echo "Fetching $PAGE_ID"
+
+            PAGE=$(curl -s \
+              -H "Authorization: Bearer $GITBOOK_TOKEN" \
+              -H "accept: application/json" \
+              "https://api.gitbook.com/v1/spaces/$SPACE_ID/content/page/$PAGE_ID?format=markdown&evaluated=false&dereferenced=false&metadata=true&computed=true")
+
+            TITLE=$(echo $PAGE | jq -r '.title')
+            MARKDOWN=$(echo $PAGE | jq -r '.markdown')
+
+            echo "=============================" >> context.txt
+            echo "$TITLE" >> context.txt
+            echo "=============================" >> context.txt
+            echo "$MARKDOWN" >> context.txt
+            echo "" >> context.txt
+
+          done < page_ids.txt
+
+          # Add sentry context
+          if [ -f sentry_event.json ]; then
+            echo "=============================" >> context.txt
+            echo "SENTRY EVENT" >> context.txt
+            echo "=============================" >> context.txt
+            echo '```json' >> context.txt
+            jq . sentry_event.json >> context.txt
+            echo '```' >> context.txt
+            echo "" >> context.txt
+          fi
+
+          # Add issue body (last)
+          if [ "${{ github.event_name }}" = "issues" ] && [ -f issue_body.txt ]; then
+            echo "=============================" >> context.txt
+            echo "ISSUE BODY" >> context.txt
+            echo "=============================" >> context.txt
+            cat issue_body.txt >> context.txt
+            echo "" >> context.txt
+          fi
+
+          echo "Context built successfully"
+
+      # --------------------------------
+      # Upload context
+      # --------------------------------
+      - name: Upload Context Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-context
+          path: context.txt

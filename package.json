@@ -1,29 +1,27 @@
 {
-  "name": "webapp",
-  "private": true,
-  "version": "0.0.0",
+  "name": "docs-sdk",
+  "version": "1.0.0",
+  "description": "Lightweight JavaScript library for managing and searching local documentation",
   "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
-  },
+  "main": "./sdk/index.js",
   "dependencies": {
-    "@sentry/react": "^10.43.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "@sentry/node": "^10.43.0"
   },
-  "devDependencies": {
-    "@eslint/js": "^9.39.4",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.0",
-    "eslint": "^9.39.4",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.5.2",
-    "globals": "^17.4.0",
-    "vite": "^8.0.0"
+  "scripts": {
+    "sdk": "node sdk/run.js"
   },
-  "packageManager": "pnpm@10.6.0+sha512.df0136e797db0cfa7ec1084e77f3bdf81bacbae9066832fbf95cba4c2140ad05e64f316cde51ce3f99ea00a91ffc702d6aedd3c0f450f895e3e7c052fe573cd8"
+  "exports": {
+    ".": "./sdk/index.js"
+  },
+  "files": [
+    "sdk"
+  ],
+  "keywords": [
+    "documentation",
+    "sdk",
+    "search",
+    "local"
+  ],
+  "author": "",
+  "license": "MIT"
 }
