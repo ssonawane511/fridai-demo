@@ -43,6 +43,9 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
+      - name: Install Jest
+        run: npm install jest --save-dev
+
       - name: Prepare Prompt
         run: |
           cat <<EOF > codex-prompt.md
