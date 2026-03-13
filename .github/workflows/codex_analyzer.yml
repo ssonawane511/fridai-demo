@@ -83,6 +83,7 @@ jobs:
           - Follow SOLID, DRY and KISS.
           - Do NOT modify package.json.
           - Do NOT commit files inside .tmp-tests/
+          - Do NOT add or modify node_modules (e.g. do not create stubs under node_modules/@sentry). @sentry/node is stubbed for Jest via jest/sentry-stub.js; just import the SDK and run tests.
           - Run tests with: NODE_OPTIONS=--experimental-vm-modules npx jest .tmp-tests (project uses ESM)
 
           Output format (in your final message):
