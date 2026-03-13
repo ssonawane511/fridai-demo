@@ -52,7 +52,16 @@ jobs:
           You are a senior JavaScript engineer.
 
           Goal:
-          Fix the issue described in the context.
+          Fix ONLY the issue described in the context. Nothing else.
+
+          CRITICAL — SCOPE AND DISCIPLINE (very important):
+
+          - IGNORE other implementations and unrelated code. Do NOT refactor, improve, or touch code outside the reported issue.
+          - FOCUS strictly on the reported issue. Read the issue/stacktrace and fix only what is broken.
+          - MINIMAL file changes: change only the files necessary to fix the issue. Prefer the smallest possible diff.
+          - Follow the software document and any AI/Sentry guidelines in the repo when implementing the fix.
+          - Apply Sentry best practices and understanding where the issue involves error reporting or instrumentation.
+          - ONLY implement the fix required for the reported issue. No extra features, no style changes, no "improvements."
 
           Workflow you must follow:
 
@@ -66,7 +75,7 @@ jobs:
 
           - The test must reproduce the issue.
           - The test must fail before the fix.
-          - Modify production code to fix the issue.
+          - Modify production code to fix the issue (minimal changes only).
           - After fixing, the test should pass.
 
           Constraints:
