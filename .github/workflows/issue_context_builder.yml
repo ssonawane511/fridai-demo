@@ -1,4 +1,4 @@
-name: ac_context_builder
+name: issue_context_builder
 
 on:
   workflow_dispatch:
