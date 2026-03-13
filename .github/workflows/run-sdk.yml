@@ -21,15 +21,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set package directory
+        id: pkg
+        run: |
+          if [ -f packages/demo-sdk/package.json ]; then
+            echo "dir=packages/demo-sdk" >> $GITHUB_OUTPUT
+          else
+            echo "dir=." >> $GITHUB_OUTPUT
+          fi
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: ${{ steps.pkg.outputs.dir }}/package-lock.json
 
       - name: Install dependencies
         run: npm install
+        working-directory: ${{ steps.pkg.outputs.dir }}
 
       - name: Run SDK demo
         run: npm run sdk
+        working-directory: ${{ steps.pkg.outputs.dir }}
