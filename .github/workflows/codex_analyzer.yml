@@ -88,6 +88,11 @@ jobs:
       - name: Install Codex CLI
         run: npm install -g @openai/codex
 
+      - name: Authenticate Codex
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: codex login --api-key "$OPENAI_API_KEY"
+
       - name: Attempt Fix (max 3)
         run: |
           set -e
@@ -97,10 +102,11 @@ jobs:
             echo "=== Attempt $i/3 ==="
             echo "OPENAI_API_KEY length: ${#OPENAI_API_KEY}"
 
-            codex \
-              --model gpt-5-codex \
-              --prompt-file codex-prompt.md \
-              --output-file codex-output.md || { echo "Codex failed"; continue; }
+            codex exec \
+              --full-auto \
+              --sandbox workspace-write \
+              -o codex-output.md \
+              "$(cat codex-prompt.md)" || { echo "Codex failed"; continue; }
 
             echo "Running temporary tests..."
             ls -la .tmp-tests/ 2>/dev/null || echo "No files in .tmp-tests yet"
