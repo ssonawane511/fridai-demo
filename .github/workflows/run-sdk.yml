@@ -1,0 +1,47 @@
+# Run SDK demo (sdk/run.js) with Sentry DSN from secrets.
+# Exercises: create, getAll, search, update, delete.
+#
+# Required secret: SENTRY_DSN (your Sentry project DSN)
+# Schedule: every minute. Inside each run: loop for 1 min, call run script every 5 sec.
+
+name: run-sdk
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "* * * * *"
+  push:
+    branches: [main, master]
+    paths:
+      - "sdk/**"
+      - "package.json"
+      - ".github/workflows/run-sdk.yml"
+
+jobs:
+  run-sdk:
+    runs-on: ubuntu-latest
+    env:
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Pull and run SDK demo every 5s for 1 minute
+        run: |
+          end=$((SECONDS + 60))
+          while [ $SECONDS -lt $end ]; do
+            echo "--- run at $SECONDS s ---"
+            git pull --ff-only origin main || true
+            npm run sdk || true
+            [ $SECONDS -lt $end ] && sleep 5
+          done
